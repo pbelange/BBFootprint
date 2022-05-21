@@ -24,10 +24,10 @@ Mu = 1e-3                                       # Molar mass constant [kg/mol]
 
 m_e =  9.10938356e-31                           # Electron mass [kg]
 m_e_eV = (m_e*c**2)/elec                        # Electron mass [eV]
-r_e = elec**2/(4*np.pi*eps0*m_e*c**2)           # Classical electron radius [m]
-r_p = elec**2/(4*np.pi*eps0*m_p*c**2)           # Classical proton radius [m]
 m_p = 1.672621898e-27                           # Proton mass [kg]
 m_p_eV = (m_p*c**2)/elec                        # Proton mass [eV]
+r_e = elec**2/(4*np.pi*eps0*m_e*c**2)           # Classical electron radius [m]
+r_p = elec**2/(4*np.pi*eps0*m_p*c**2)           # Classical proton radius [m]
 
 
 

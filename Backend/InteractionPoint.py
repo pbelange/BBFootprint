@@ -1,4 +1,4 @@
-
+import copy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,39 +13,86 @@ class InteractionPoint:
         self.name = IP
         self.num  = IP[-1]
         
-        self.b1 = b1
-        self.b2 = b2
-    
-        # Forcing the position of BBLR interactions
-        _tmp = np.arange(0,150,7.5/2)[1:]
-        self.s_BBLR = np.concatenate((-np.flip(_tmp),_tmp))
+        self.b1 = copy.deepcopy(b1.at_IP(IP))
+        self.b2 = copy.deepcopy(b2.at_IP(IP))
+            
+        # Dataframe with all beam-beam informations
+        #============================================
+        self.bb = self.make_bb_df()
         
-        # Computing the separation between the beams in each plane
-        self.xsep,self.ysep = self.get_xsep_ysep(self,self.s_BBLR)
+        
+        
+        
+    def make_bb_df(self,):
+        
+        # Using .values to drop the index since different for b1,b2
+        _BB = pd.DataFrame({ 's'          : self.b1.bb['s_lab'],
+                            ('b1','x_lab'): self.b1.bb['x_lab'].values,
+                            ('b1','y_lab'): self.b1.bb['y_lab'].values,
+                            ('b2','x_lab'): self.b2.bb['x_lab'].values,
+                            ('b2','y_lab'): self.b2.bb['y_lab'].values,         
+                            })
+        # Note: these .get_ methods are interpolated, but completely identical to the value we would get at the 
+        _BB.insert(1,'r'   ,self.b2.get_sigy(_BB['s'])/self.b2.get_sigx(_BB['s']))
+        _BB.insert(2,'dx'  ,_BB[('b2','x_lab')]-_BB[('b1','x_lab')])
+        _BB.insert(3,'dy'  ,_BB[('b2','y_lab')]-_BB[('b1','y_lab')])
+        _BB.insert(4,'dx_n',_BB['dx']/self.b2.get_sigx(_BB['s']))
+        _BB.insert(5,'dy_n',_BB['dy']/self.b2.get_sigy(_BB['s']))
+        
+        
+        # Making sure that the s location for both beams is compatible
+        assert(np.all(np.array(_BB.s) == np.array(self.b2.bb.s_lab)))
+        
+        # Making sure that the interpolation at the marker location gives precisely the same value
+        assert(np.all(np.array(_BB[('b2','x_lab')]) == self.b2.get_x_lab(self.b2.bb.s_lab)))
+        
+        return _BB
     
-    def get_xsep_ysep(self,s):
-        Dx = self.b2.get_x_lab(s) - self.b1.get_x_lab(s)
-        Dy = self.b2.get_y_lab(s) - self.b1.get_y_lab(s)
-        return Dx,Dy
+    def get_dx_dy(self,s):
+        dx = self.b2.get_x_lab(s) - self.b1.get_x_lab(s)
+        dy = self.b2.get_y_lab(s) - self.b1.get_y_lab(s)
+        return dx,dy
+    
+    def get_dx_n_dy_n(self,s):
+        dx,dy = self.get_dx_dy(s)
+        dx_n  = dx/self.b2.get_sigx(s)
+        dy_n  = dy/self.b2.get_sigy(s)
+        return dx_n,dy_n
+    
+#    strong -> b2
+#    r      -> sigmay/sigmax
+#    dx     -> x_b2-x_b1
+#    dx_n   -> dx/sigmax_b2
+#    dy_n   -> dy/sigmay_b2
+    
+    
         
 class Beam:
-    def __init__(self,beam,Nb=None,E=None,emittx_n=None,emitty_n=None,dp_p0 = None)
+    def __init__(self,beam,twiss,survey,Nb=None,E=None,emittx_n=None,emitty_n=None,dp_p0 = None):
         self.__type__ = 'Beam'
         self.name = beam
         self.num  = beam[-1]
-        self.twiss,self.survey = None,None
+        self.twiss_full,self.survey_full  = twiss,survey
+        self.twiss,self.survey  = twiss,survey
+        self.bb,self.lr,self.ho = None,None,None
     
         # Beam properties
         self.Nb       = Nb
         self.E        = E
         self.emittx_n = emittx_n
         self.emitty_n = emitty_n
-        self.dp_p0    = dp_p
+        self.dp_p0    = dp_p0
         
     # To extract around an IP
     #---------------------------
-    def at_IP(self,IP,twiss,survey):
-        self.twiss,self.survey = extract_IP_ROI(IP,self.name,twiss,survey)
+    def at_IP(self,IP):
+        self.twiss,self.survey = extract_IP_ROI(IP,self.name,self.twiss_full,self.survey_full)
+        
+        # Shortcut for long range and head on markers
+        self.bb = self.twiss.loc[self.twiss.index.str.contains('bb_')]
+        self.lr = self.twiss.loc[self.twiss.index.str.contains('bb_lr')]
+        self.ho = self.twiss.loc[self.twiss.index.str.contains('bb_ho')]
+        
         return self
 
 
@@ -111,6 +158,7 @@ class Beam:
         return -self.Nb*cst.r_p*self.get_bety(s)/(2*np.pi*self.gamma_r*self.get_sigy(s)*(self.get_sigx(s)+self.get_sigy(s)))
     #-----
 
+
 def extract_IP_ROI(IP,beam,twiss,survey):
     
     # ROI from dipoles
@@ -118,11 +166,12 @@ def extract_IP_ROI(IP,beam,twiss,survey):
     ROI_survey = survey.loc[f'mb.a8l{IP[-1]}.{beam}_dex':f'mb.a8r{IP[-1]}.{beam}_den'].copy()
 
     # Angle for rotation of survey
-    angle = ROI_survey.loc[IP,'theta']+3*np.pi/2
+    angle = -ROI_survey.loc[IP,'theta']
     
-    x,z =  ROI_survey['x'], ROI_survey['z']
-    xx = x*np.cos(angle) - z*np.sin(angle)
-    zz = x*np.sin(angle) + z*np.cos(angle)
+    # Re-centering before rotating
+    z,x =  ROI_survey['z']-ROI_survey.loc[IP,'z'], ROI_survey['x']-ROI_survey.loc[IP,'x']
+    zz = z*np.cos(angle) - x*np.sin(angle)
+    xx = z*np.sin(angle) + x*np.cos(angle)
     
     # Inserting in dataframe
     ROI_survey.insert(1,'x_rot',xx)
@@ -131,9 +180,12 @@ def extract_IP_ROI(IP,beam,twiss,survey):
     ROI_survey.insert(4,'s_rot',ROI_survey['s']-ROI_survey.loc[IP,'s'])
     
     # Lab frame coordinates
-    ROI_twiss.insert(1,'x_lab',ROI_twiss['x'] + ROI_survey['z_rot'])
-    ROI_twiss.insert(2,'y_lab',ROI_twiss['y'] + ROI_survey['y_rot'])
-    ROI_twiss.insert(3,'s_lab',ROI_twiss['s'] - ROI_twiss.loc[IP,'s'])
+    if beam=='b2':
+        ROI_twiss.insert(1,'x_lab',ROI_twiss['x'] + ROI_survey['x_rot'])
+        ROI_twiss.insert(2,'y_lab',ROI_twiss['y'] + ROI_survey['y_rot'])
+        ROI_twiss.insert(3,'s_lab',ROI_twiss['s'] - ROI_twiss.loc[IP,'s'])
     
     
     return ROI_twiss,ROI_survey
+
+
