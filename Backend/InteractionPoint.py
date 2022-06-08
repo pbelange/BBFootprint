@@ -2,6 +2,7 @@ import copy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.special as sciSpec
 import warnings
 
 
@@ -19,9 +20,9 @@ class InteractionPoint:
         # Dataframe with all beam-beam informations
         #============================================
         self.bb = self.make_bb_df()
-        
-        
-        
+        self.lr = self.bb.loc[self.bb.index.str.contains('bb_lr')]
+        self.ho = self.bb.loc[self.bb.index.str.contains('bb_ho')]
+              
         
     def make_bb_df(self,):
         
@@ -39,6 +40,13 @@ class InteractionPoint:
         _BB.insert(4,'dx_n',_BB['dx']/self.b2.get_sigx(_BB['s']))
         _BB.insert(5,'dy_n',_BB['dy']/self.b2.get_sigy(_BB['s']))
         
+        # Weak beam beta function
+        _BB.insert(6,'betx',self.b1.get_betx(_BB['s']))
+        _BB.insert(7,'bety',self.b1.get_bety(_BB['s']))
+        
+        # Strong beam quadrupolar and octupolar component:
+        _BB.insert(8,'k1',[self.b2.strong_knl(_dx,_dy)[0][1] for _dx,_dy in zip(_BB['dx'],_BB['dy'])])
+        _BB.insert(9,'k3',[self.b2.strong_knl(_dx,_dy)[0][3] for _dx,_dy in zip(_BB['dx'],_BB['dy'])])
         
         # Making sure that the s location for both beams is compatible
         assert(np.all(np.array(_BB.s) == np.array(self.b2.bb.s_lab)))
@@ -59,11 +67,7 @@ class InteractionPoint:
         dy_n  = dy/self.b2.get_sigy(s)
         return dx_n,dy_n
     
-#    strong -> b2
-#    r      -> sigmay/sigmax
-#    dx     -> x_b2-x_b1
-#    dx_n   -> dx/sigmax_b2
-#    dy_n   -> dy/sigmay_b2
+
     
     
         
@@ -88,14 +92,29 @@ class Beam:
     def at_IP(self,IP):
         self.twiss,self.survey = extract_IP_ROI(IP,self.name,self.twiss_full,self.survey_full)
         
+        #if self.name == 'b2':
+        #    self.twiss['s']     *= -1
+        #    self.twiss['s_lab'] *= -1
+        
         # Shortcut for long range and head on markers
         self.bb = self.twiss.loc[self.twiss.index.str.contains('bb_')]
         self.lr = self.twiss.loc[self.twiss.index.str.contains('bb_lr')]
         self.ho = self.twiss.loc[self.twiss.index.str.contains('bb_ho')]
         
         return self
-
-
+    
+    # To find multipole expansion
+    #---------------------------
+    def strong_knl(self,dx,dy):
+        IL_eq = -self.Nb*cst.elec*cst.c
+        
+        n = np.arange(12+1)
+        integratedComp = -cst.mu0*(IL_eq)*sciSpec.factorial(n)/(2*np.pi)/(dx+1j*dy)**(n+1)
+        _kn,_sn = np.real(integratedComp),np.imag(integratedComp)
+        
+        knl,snl = _kn/self.p0,_sn/self.p0
+        return  knl,snl
+        
     # Some additionnal properties
     #---------------------------
     @property
@@ -153,9 +172,9 @@ class Beam:
         return np.sqrt(self.get_bety(s)*self.emitty)
     #-----
     def get_xi_x(self,s):
-        return -self.Nb*cst.r_p*self.get_betx(s)/(2*np.pi*self.gamma_r*self.get_sigx(s)*(self.get_sigx(s)+self.get_sigy(s)))
+        return self.Nb*cst.r_p*self.get_betx(s)/(2*np.pi*self.gamma_r*self.get_sigx(s)*(self.get_sigx(s)+self.get_sigy(s)))
     def get_xi_y(self,s):
-        return -self.Nb*cst.r_p*self.get_bety(s)/(2*np.pi*self.gamma_r*self.get_sigy(s)*(self.get_sigx(s)+self.get_sigy(s)))
+        return self.Nb*cst.r_p*self.get_bety(s)/(2*np.pi*self.gamma_r*self.get_sigy(s)*(self.get_sigx(s)+self.get_sigy(s)))
     #-----
 
 
@@ -180,10 +199,9 @@ def extract_IP_ROI(IP,beam,twiss,survey):
     ROI_survey.insert(4,'s_rot',ROI_survey['s']-ROI_survey.loc[IP,'s'])
     
     # Lab frame coordinates
-    if beam=='b2':
-        ROI_twiss.insert(1,'x_lab',ROI_twiss['x'] + ROI_survey['x_rot'])
-        ROI_twiss.insert(2,'y_lab',ROI_twiss['y'] + ROI_survey['y_rot'])
-        ROI_twiss.insert(3,'s_lab',ROI_twiss['s'] - ROI_twiss.loc[IP,'s'])
+    ROI_twiss.insert(1,'x_lab',ROI_twiss['x'] + ROI_survey['x_rot'])
+    ROI_twiss.insert(2,'y_lab',ROI_twiss['y'] + ROI_survey['y_rot'])
+    ROI_twiss.insert(3,'s_lab',ROI_twiss['s'] - ROI_twiss.loc[IP,'s'])
     
     
     return ROI_twiss,ROI_survey
