@@ -18,7 +18,7 @@ import Backend.Constants as cst
 #    Full analytic detuning
 #================================================================================
 
-def DQx_DQy(ax,ay,r,dx_n,dy_n,xi,method='fast'):
+def DQx_DQy(ax,ay,r,dx_n,dy_n,xi,A_w_s,B_w_s,method='fast'):
     """
     Notes: 
     The function expects an array for ax,ay, and a single value for the other parameters
@@ -27,10 +27,12 @@ def DQx_DQy(ax,ay,r,dx_n,dy_n,xi,method='fast'):
     r     -> sigma_y/sigma_x
     dx,sy -> normalized bb separation, dx_n = dx/sigma_strong
     xi    -> beam-beam parameter
+    A_w_s -> sigma_w_x/sigma_s_y
+    B_w_s -> sigma_w_y/sigma_s_x
     """
-    DQx = np.array([2*xi*dC00dx(_ax,_ay,r,dx_n,dy_n,method)/_ax for _ax,_ay in zip(ax,ay)])
-    DQy = np.array([2*xi*dC00dy(_ax,_ay,r,dx_n,dy_n,method)/_ay for _ax,_ay in zip(ax,ay)])
-    return DQx,DQy
+    DQx = np.array([2*xi*dC00dx(A_w_s*_ax,B_w_s*_ay,r,dx_n,dy_n,method)/(A_w_s*_ax) for _ax,_ay in zip(ax,ay)])
+    DQy = np.array([2*xi*dC00dy(A_w_s*_ax,B_w_s*_ay,r,dx_n,dy_n,method)/(B_w_s*_ay) for _ax,_ay in zip(ax,ay)])
+    return (A_w_s**2)*DQx,(B_w_s**2)*DQy
 
 #================================================================================
 #---------------------------------------
@@ -159,21 +161,63 @@ def BBLR_octupole(Jx,Jy,betx,bety,k1,k3):
     
     return DQx,DQy
 
+
+
+
+
+
+
+
+def Z1(x):
+    return np.exp(-x)*(sciSpec.iv(0,x)-sciSpec.iv(1,x))
+
+def Z2(x):
+    return np.exp(-x)*sciSpec.iv(0,x)
+
+def HeadOn_round_generating(t,alphax,alphay,r):
+    # Assume in x direction. For y, change x->y, y->x, r->1/r
+    # See: https://inspirehep.net/files/d7fed02b4b59558edf043a65f0f92049
+    prefactor = 1/((1+t)**(3/2)* (1+t/r**2)**(1/2))
+    return (1+1/r)/2* prefactor * Z1(alphax/(1+t)) * Z2(alphay/(1+t/r**2))
     
-def HeadOn_round_generating(t,Jx,Jy,emitt):
-    term1 = 1/(1+t**2)*np.exp(-(Jx+Jy)/(2*emitt*(1+t)))
-    term2 = sciSpec.iv(0,Jy/(2*emitt*(1+t)))
-    term3 = sciSpec.iv(0,Jx/(2*emitt*(1+t)))-sciSpec.iv(1,Jx/(2*emitt*(1+t)))
-    return term1*term2*term3
     
+def HeadOn_round(ax,ay,r,emitt,xi):
     
-def HeadOn_round(Jx,Jy,emitt,xi):
+    if isinstance(emitt, (int, float)):
+        emitt = emitt*np.ones(2)
+    if isinstance(xi, (int, float)):
+        xi = xi*np.ones(2)
         
+    # Normalization from Chao
+    alphax = ax**2/(2*(1+emitt[1]/emitt[0]))
+    alphay = ay**2/(2*(1+emitt[0]/emitt[1]))
+    
     # Tune shifts, t is the integration variable
-    DQx_n = np.array([integrate.quad(lambda t: HeadOn_round_generating(t,_Jx,_Jy,emitt), 0, np.inf)[0] for _Jx,_Jy in zip(Jx,Jy)])
-    DQy_n = np.array([integrate.quad(lambda t: HeadOn_round_generating(t,_Jy,_Jx,emitt), 0, np.inf)[0] for _Jx,_Jy in zip(Jx,Jy)])
+    DQx_n = np.array([integrate.quad(lambda t: HeadOn_round_generating(t,_alphax,_alphay,r)  , 0, np.inf)[0] for _alphax,_alphay in zip(alphax,alphay)])
+    DQy_n = np.array([integrate.quad(lambda t: HeadOn_round_generating(t,_alphay,_alphax,1/r), 0, np.inf)[0] for _alphax,_alphay in zip(alphax,alphay)])
       
-    return -xi*DQx_n,-xi*DQy_n
+    return -xi[0]*DQx_n,-xi[1]*DQy_n
+
+
+
+
+# OLD
+
+    
+#def HeadOn_round_generating(t,Jx,Jy,emitt):
+#    term1 = 1/(1+t**2)*np.exp(-(Jx+Jy)/(2*emitt*(1+t)))
+#    term2 = sciSpec.iv(0,Jy/(2*emitt*(1+t)))
+#    term3 = sciSpec.iv(0,Jx/(2*emitt*(1+t)))-sciSpec.iv(1,Jx/(2*emitt*(1+t)))
+#    return term1*term2*term3
+#    
+#    
+#def HeadOn_round(Jx,Jy,emitt,xi):
+#        
+#    # Tune shifts, t is the integration variable
+#    DQx_n = np.array([integrate.quad(lambda t: HeadOn_round_generating(t,_Jx,_Jy,emitt), 0, np.inf)[0] #for _Jx,_Jy in zip(Jx,Jy)])
+#    DQy_n = np.array([integrate.quad(lambda t: HeadOn_round_generating(t,_Jy,_Jx,emitt), 0, np.inf)[0] #for _Jx,_Jy in zip(Jx,Jy)])
+#      
+#    return -xi*DQx_n,-xi*DQy_n
 
 
 #================================================================================

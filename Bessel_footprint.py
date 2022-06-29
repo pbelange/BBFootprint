@@ -15,11 +15,11 @@ import Backend.Footprint as fp
 import Backend.BeamPhysics as BP
 
 # Importing twiss and survey
-twiss_b1  = pd.read_pickle('LHC_sequence/lhcb1_twiss.pkl')
-survey_b1 = pd.read_pickle('LHC_sequence/lhcb1_survey.pkl')
+twiss_b1  = pd.read_pickle('LHC_sequence/lhcb1_opticsfile30_twiss.pkl')
+survey_b1 = pd.read_pickle('LHC_sequence/lhcb1_opticsfile30_survey.pkl')
 
-twiss_b2  = pd.read_pickle('LHC_sequence/lhcb2_twiss.pkl')
-survey_b2 = pd.read_pickle('LHC_sequence/lhcb2_survey.pkl')
+twiss_b2  = pd.read_pickle('LHC_sequence/lhcb2_opticsfile30_twiss.pkl')
+survey_b2 = pd.read_pickle('LHC_sequence/lhcb2_opticsfile30_survey.pkl')
 
 
 B1 = inp.Beam('b1',twiss_b1,survey_b1,
@@ -90,6 +90,8 @@ def compute_lr_ho_footprint(coord):
                                            r    = _bb['r'],
                                            dx_n = _bb['dx_n'],
                                            dy_n = _bb['dy_n'],
+                                           A_w_s= _bb['A_w_s'],
+                                           B_w_s= _bb['B_w_s'],
                                            xi   = _IP.b2.xi)
 
                 DQx_oct += _DQx
@@ -108,6 +110,8 @@ def compute_lr_ho_footprint(coord):
                                        r    = main_ho['r'],
                                        dx_n = main_ho['dx_n'],
                                        dy_n = main_ho['dy_n'],
+                                       A_w_s= main_ho['A_w_s'],
+                                       B_w_s= main_ho['B_w_s'],
                                        xi   = _IP.b2.xi)
             DQx_ho += _DQx
             DQy_ho += _DQy

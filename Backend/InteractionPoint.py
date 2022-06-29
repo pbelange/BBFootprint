@@ -40,13 +40,17 @@ class InteractionPoint:
         _BB.insert(4,'dx_n',_BB['dx']/self.b2.get_sigx(_BB['s']))
         _BB.insert(5,'dy_n',_BB['dy']/self.b2.get_sigy(_BB['s']))
         
+        # Non-symmetric parameters
+        _BB.insert(6,'A_w_s',self.b1.get_sigx(_BB['s'])/self.b2.get_sigy(_BB['s']))
+        _BB.insert(7,'B_w_s',self.b1.get_sigy(_BB['s'])/self.b2.get_sigx(_BB['s']))
+        
         # Weak beam beta function
-        _BB.insert(6,'betx',self.b1.get_betx(_BB['s']))
-        _BB.insert(7,'bety',self.b1.get_bety(_BB['s']))
+        _BB.insert(8,'betx',self.b1.get_betx(_BB['s']))
+        _BB.insert(9,'bety',self.b1.get_bety(_BB['s']))
         
         # Strong beam quadrupolar and octupolar component:
-        _BB.insert(8,'k1',[self.b2.strong_knl(_dx,_dy)[0][1] for _dx,_dy in zip(_BB['dx'],_BB['dy'])])
-        _BB.insert(9,'k3',[self.b2.strong_knl(_dx,_dy)[0][3] for _dx,_dy in zip(_BB['dx'],_BB['dy'])])
+        _BB.insert(10,'k1',[self.b2.strong_knl(_dx,_dy)[0][1] for _dx,_dy in zip(_BB['dx'],_BB['dy'])])
+        _BB.insert(11,'k3',[self.b2.strong_knl(_dx,_dy)[0][3] for _dx,_dy in zip(_BB['dx'],_BB['dy'])])
         
         # Making sure that the s location for both beams is compatible
         assert(np.all(np.array(_BB.s) == np.array(self.b2.bb.s_lab)))
@@ -181,9 +185,13 @@ class Beam:
 def extract_IP_ROI(IP,beam,twiss,survey):
     
     # ROI from dipoles
+    #try:
     ROI_twiss  =  twiss.loc[f'mb.a8l{IP[-1]}.{beam}_dex':f'mb.a8r{IP[-1]}.{beam}_den'].copy()
     ROI_survey = survey.loc[f'mb.a8l{IP[-1]}.{beam}_dex':f'mb.a8r{IP[-1]}.{beam}_den'].copy()
-
+    #except:
+    #    ROI_twiss  =  twiss.loc[f'mb.a8l{IP[-1]}.{beam}':f'mb.a8r{IP[-1]}.{beam}'].copy()
+    #    ROI_survey = survey.loc[f'mb.a8l{IP[-1]}.{beam}':f'mb.a8r{IP[-1]}.{beam}'].copy()
+        
     # Angle for rotation of survey
     angle = -ROI_survey.loc[IP,'theta']
     

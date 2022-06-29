@@ -15,11 +15,11 @@ import Backend.Footprint as fp
 import Backend.BeamPhysics as BP
 
 # Importing twiss and survey
-twiss_b1  = pd.read_pickle('LHC_sequence/lhcb1_twiss.pkl')
-survey_b1 = pd.read_pickle('LHC_sequence/lhcb1_survey.pkl')
+twiss_b1  = pd.read_pickle('LHC_sequence/lhcb1_opticsfile30_twiss.pkl')
+survey_b1 = pd.read_pickle('LHC_sequence/lhcb1_opticsfile30_survey.pkl')
 
-twiss_b2  = pd.read_pickle('LHC_sequence/lhcb2_twiss.pkl')
-survey_b2 = pd.read_pickle('LHC_sequence/lhcb2_survey.pkl')
+twiss_b2  = pd.read_pickle('LHC_sequence/lhcb2_opticsfile30_twiss.pkl')
+survey_b2 = pd.read_pickle('LHC_sequence/lhcb2_opticsfile30_survey.pkl')
 
 
 B1 = inp.Beam('b1',twiss_b1,survey_b1,
@@ -101,8 +101,14 @@ def compute_lr_ho_footprint(coord):
 
 
             # Computing Head-on component (ex: bb_ho.c1b1_00):
+            main_ho = _IP.ho.loc[f'bb_ho.c{_IP.name[-1]}b1_00']
             #------------------------------
-            _DQx,_DQy =  dtune.HeadOn_round(coord['J_x'],coord['J_y'],_IP.b2.emittx,_IP.b2.xi)
+            #_DQx,_DQy =  dtune.HeadOn_round(coord['J_x'],coord['J_y'],_IP.b2.emittx,_IP.b2.xi)
+            _DQx,_DQy = dtuneHeadOn_round(ax    = coord['x_n'],
+                                          ay    = coord['y_n'],
+                                          r     = main_ho['r'],
+                                          emitt = _IP.b2.emittx,
+                                          xi    = _IP.b2.xi)
             DQx_ho += _DQx
             DQy_ho += _DQy
             
