@@ -43,3 +43,27 @@ IP5 = inp.InteractionPoint('ip5',B1,B2)
 From there, `IP1.b1.twiss` contains all the information necessary, including the coordinates in the lab frame, and `IP1.bb/IP1.lr/IP1.ho` contains dataframes with the BB parameters computed for `All BB/LR only/HO only`.
 
 An example of footprint computation is found in `demo_detuning.ipynb`.
+
+## Detuning
+
+The detuning from a given LR (or HO) interaction can be computed analytically following:
+
+```python
+import Backend.Detuning as dtune
+
+_bb = IP5.lr.loc['bb_lr.r5b1_13']
+
+DQx,DQy = dtune.DQx_DQy( ax   = coord['x_n'],
+                         ay   = coord['y_n'],
+                         r    = _bb['r'],
+                         dx_n = _bb['dx_n'],
+                         dy_n = _bb['dy_n'],
+                         A_w_s= _bb['A_w_s'],
+                         B_w_s= _bb['B_w_s'],
+                         xi   = IP5.b2.xi)
+```
+
+The explanation for the physics and the underlying equations can be found from the papers in:
+https://cernbox.cern.ch/index.php/s/bQqj58FQDVgGUfw
+
+Note that `A_w_s` and `B_w_s` are described in the addendum. These numbers are necessary for the general solution of the detuning, where the optics of the weak beam and the strong beam are not necessarily antisymmetric.
